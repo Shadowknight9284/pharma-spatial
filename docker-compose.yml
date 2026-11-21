@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: pharma
+      POSTGRES_PASSWORD: pharma
+      POSTGRES_DB: pharma
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    # Big COPY/aggregate workloads: give Postgres room
+    command: >
+      postgres -c shared_buffers=2GB -c work_mem=256MB -c maintenance_work_mem=1GB
+               -c max_wal_size=8GB -c effective_cache_size=6GB
+volumes:
+  pgdata:

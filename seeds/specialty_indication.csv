@@ -1,0 +1,32 @@
+product_id,prscrbr_type,indication,weight
+DUPIXENT,Dermatology,atopic_dermatitis,1
+DUPIXENT,Pulmonary Disease,asthma,0.5
+DUPIXENT,Pulmonary Disease,copd,0.5
+DUPIXENT,Allergy/ Immunology,asthma,0.6
+DUPIXENT,Allergy/ Immunology,atopic_dermatitis,0.4
+DUPIXENT,Otolaryngology,crswnp,1
+DUPIXENT,Gastroenterology,eoe,1
+DUPIXENT,*,atopic_dermatitis,1
+ADBRY,*,atopic_dermatitis,1
+EBGLYSS,*,atopic_dermatitis,1
+NUCALA,Pulmonary Disease,asthma,1
+NUCALA,Allergy/ Immunology,asthma,1
+NUCALA,Otolaryngology,crswnp,1
+NUCALA,*,asthma,1
+FASENRA,*,asthma,1
+TEZSPIRE,*,asthma,1
+XOLAIR,Dermatology,csu,1
+XOLAIR,Allergy/ Immunology,asthma,1
+XOLAIR,Otolaryngology,crswnp,1
+XOLAIR,*,asthma,1
+ELIQUIS,*,nonvalvular_af,1
+XARELTO,*,nonvalvular_af,1
+PRADAXA,*,nonvalvular_af,1
+SAVAYSA,*,nonvalvular_af,1
+JARDIANCE,Cardiology,heart_failure,1
+JARDIANCE,Nephrology,ckd,1
+JARDIANCE,*,t2d,1
+FARXIGA,Cardiology,heart_failure,1
+FARXIGA,Nephrology,ckd,1
+FARXIGA,*,t2d,1
+INVOKANA,*,t2d,1

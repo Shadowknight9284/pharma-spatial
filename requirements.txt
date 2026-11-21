@@ -1,0 +1,7 @@
+psycopg[binary]>=3.1
+pandas>=2.1
+requests>=2.31
+# optional: county polygons into PostGIS
+geopandas>=0.14
+sqlalchemy>=2.0
+geoalchemy2>=0.14

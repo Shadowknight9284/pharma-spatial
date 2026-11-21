@@ -1,0 +1,5 @@
+class_id,class_name,description
+T2_BIOLOGIC,Type 2 inflammation biologics,"IL-4R/IL-13/IL-5/TSLP/IgE biologics competing in atopic dermatitis, asthma, COPD"
+DOAC,Direct oral anticoagulants,Factor Xa and thrombin inhibitors (AF stroke prevention / VTE)
+SGLT2,SGLT2 inhibitors,"Single-ingredient SGLT2s (T2D, heart failure, CKD); combos excluded"
+BASAL_INSULIN,Basal insulins,Long-acting insulin glargine / degludec products

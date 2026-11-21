@@ -1,0 +1,21 @@
+product_id,brand_name,generic_name,company,class_id,benefit,default_indication,notes
+DUPIXENT,Dupixent,dupilumab,Sanofi/Regeneron,T2_BIOLOGIC,D,atopic_dermatitis,"Co-promoted: payments come from Sanofi-Aventis and Regeneron entities"
+ADBRY,Adbry,tralokinumab,LEO Pharma,T2_BIOLOGIC,D,atopic_dermatitis,
+EBGLYSS,Ebglyss,lebrikizumab,Eli Lilly,T2_BIOLOGIC,D,atopic_dermatitis,US launch late 2024
+NUCALA,Nucala,mepolizumab,GSK,T2_BIOLOGIC,D/B,asthma,Self-injected (Part D) and clinic-administered (Part B J2182)
+FASENRA,Fasenra,benralizumab,AstraZeneca,T2_BIOLOGIC,D/B,asthma,Part B J0517
+TEZSPIRE,Tezspire,tezepelumab,Amgen/AstraZeneca,T2_BIOLOGIC,D/B,asthma,Part B J2356
+XOLAIR,Xolair,omalizumab,Genentech/Novartis,T2_BIOLOGIC,D/B,asthma,Part B J2357; also CSU and food allergy
+ELIQUIS,Eliquis,apixaban,BMS/Pfizer,DOAC,D,nonvalvular_af,
+XARELTO,Xarelto,rivaroxaban,Janssen (J&J),DOAC,D,nonvalvular_af,
+PRADAXA,Pradaxa,dabigatran,Boehringer Ingelheim,DOAC,D,nonvalvular_af,
+SAVAYSA,Savaysa,edoxaban,Daiichi Sankyo,DOAC,D,nonvalvular_af,
+JARDIANCE,Jardiance,empagliflozin,Boehringer Ingelheim/Lilly,SGLT2,D,t2d,
+FARXIGA,Farxiga,dapagliflozin,AstraZeneca,SGLT2,D,t2d,
+INVOKANA,Invokana,canagliflozin,Janssen (J&J),SGLT2,D,t2d,
+LANTUS,Lantus,insulin glargine,Sanofi,BASAL_INSULIN,D,diabetes,
+TOUJEO,Toujeo,insulin glargine U-300,Sanofi,BASAL_INSULIN,D,diabetes,
+BASAGLAR,Basaglar,insulin glargine,Eli Lilly,BASAL_INSULIN,D,diabetes,
+REZVOGLAR,Rezvoglar,insulin glargine-aglr,Eli Lilly,BASAL_INSULIN,D,diabetes,
+SEMGLEE,Semglee,insulin glargine-yfgn,Biocon/Viatris,BASAL_INSULIN,D,diabetes,
+TRESIBA,Tresiba,insulin degludec,Novo Nordisk,BASAL_INSULIN,D,diabetes,

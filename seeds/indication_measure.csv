@@ -1,0 +1,12 @@
+indication,places_measure_id,note
+atopic_dermatitis,,Not in CDC PLACES; falls back to 65+ population
+asthma,CASTHMA,Current asthma among adults
+copd,COPD,COPD among adults
+crswnp,,No public county prevalence
+eoe,,No public county prevalence
+csu,,No public county prevalence
+nonvalvular_af,,AF not in PLACES; 65+ population is a reasonable proxy
+t2d,DIABETES,Diagnosed diabetes among adults (T1+T2)
+diabetes,DIABETES,Diagnosed diabetes among adults
+heart_failure,CHD,PLACES has coronary heart disease not HF; weak proxy
+ckd,KIDNEY,Chronic kidney disease among adults
