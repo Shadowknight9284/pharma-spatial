@@ -178,6 +178,13 @@ rows = [["1", z, "ZCTA5 " + z, f, n, "9000000"] for f, z, _, n in COUNTIES]
 rows.append(["1", "08854", "ZCTA5 08854", "34035", "Somerset County", "100"])
 p = OUT / "zcta_county.txt"; write_csv(p, hdr, rows, sep="|"); reg("zcta_county", p)
 
+# ZCTA->town and the CT old-county -> planning-region crosswalk (one Hartford row)
+hdr = ["GEOID_ZCTA5_20", "GEOID_COUSUB_20", "AREALAND_PART"]
+p = OUT / "zcta_cousub.txt"; write_csv(p, hdr, [["06103", "0900337070", "5000000"]], sep="|"); reg("zcta_cousub", p)
+hdr = ["STATEFP\n(INCITS38)", "OLD_COUNTYFP\n(INCITS31)", "NEW_COUNTYFP\n(INCITS31)", "OLD_COUSUB_GEOID", "NEW_COUSUB_GEOID"]
+p = OUT / "ct_cousub_xwalk.txt"
+write_csv(p, hdr, [["09", "003", "110", "0900337070", "0911037070"]], sep="|"); reg("ct_cousub_xwalk", p)
+
 # SVI
 hdr = ["ST", "STATE", "COUNTY", "FIPS", "E_TOTPOP", "RPL_THEME1", "RPL_THEME2", "RPL_THEME3", "RPL_THEME4", "RPL_THEMES"]
 rows = [[f[:2], "X", n, f, "500000", *[f"{random.random():.4f}" for _ in range(4)], f"{random.random():.4f}"]

@@ -245,6 +245,20 @@ SOURCES: dict[str, Source] = {s.name: s for s in [
         note="ZCTA->county; we assign each ZIP to the county holding most of its land.",
     ),
     Source(
+        "zcta_cousub", "zcta_cousub",
+        lambda y: "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_cousub20_natl.txt",
+        sep="|", encoding="utf-8-sig",
+        usecols=["GEOID_ZCTA5_20", "GEOID_COUSUB_20", "AREALAND_PART"],
+        note="ZCTA->town; only used for Connecticut (see ct_cousub_xwalk).",
+    ),
+    Source(
+        "ct_cousub_xwalk", "ct_cousub_xwalk",
+        lambda y: "https://www2.census.gov/geo/docs/reference/ct_change/ct_cou_to_cousub_crosswalk.txt",
+        sep="|", encoding="utf-8-sig",
+        note="CT replaced its 8 counties with 9 planning regions in 2022. 2020 ZIP->county "
+             "files use the old counties; ACS/SVI/TIGER use the new ones. Town -> region.",
+    ),
+    Source(
         "svi_county", "svi_county",
         lambda y: "https://svi.cdc.gov/Documents/Data/2022/csv/states_counties/SVI_2022_US_county.csv",
         usecols=["FIPS", "STATE", "COUNTY", "E_TOTPOP", "RPL_THEMES",

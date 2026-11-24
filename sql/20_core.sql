@@ -7,19 +7,41 @@
 -- GEOGRAPHY
 -- ---------------------------------------------------------------------
 -- ZIP (≈ZCTA) -> single county: the county holding the most of its land.
+-- Connecticut: the 2020 ZIP->county file uses CT's 8 old counties, but ACS,
+-- SVI and TIGER (2022+) use its 9 planning regions. CT ZIPs go ZIP -> 2020
+-- town (zcta_cousub) -> planning region (Census ct_cousub_xwalk) instead.
 DROP TABLE IF EXISTS core.zip_county CASCADE;
 CREATE TABLE core.zip_county AS
-SELECT DISTINCT ON (geoid_zcta5_20)
-       geoid_zcta5_20                    AS zip5,
-       geoid_county_20                   AS county_fips,
-       core.num(arealand_part)           AS land_part
-FROM raw.zcta_county
-WHERE geoid_zcta5_20 <> '' AND geoid_county_20 <> ''
-ORDER BY geoid_zcta5_20, core.num(arealand_part) DESC NULLS LAST;
+WITH parts AS (
+  SELECT geoid_zcta5_20 AS zip5, geoid_county_20 AS county_fips, core.num(arealand_part) AS land
+  FROM raw.zcta_county
+  WHERE geoid_zcta5_20 <> '' AND geoid_county_20 <> '' AND left(geoid_county_20, 2) <> '09'
+  UNION ALL
+  SELECT z.geoid_zcta5_20, '09' || lpad(x.new_countyfp_incits31, 3, '0'), sum(core.num(z.arealand_part))
+  FROM raw.zcta_cousub z
+  JOIN raw.ct_cousub_xwalk x ON x.old_cousub_geoid = z.geoid_cousub_20
+  WHERE left(z.geoid_cousub_20, 2) = '09' AND z.geoid_zcta5_20 <> ''
+  GROUP BY 1, 2
+)
+SELECT DISTINCT ON (zip5) zip5, county_fips, land AS land_part
+FROM parts
+ORDER BY zip5, land DESC NULLS LAST;
 ALTER TABLE core.zip_county ADD PRIMARY KEY (zip5);
 
+-- ACS arrives raw (API shape). 65+ = B01001_020..025 (male) + _044..049 (female).
 DROP TABLE IF EXISTS core.county CASCADE;
 CREATE TABLE core.county AS
+WITH acs AS (
+  SELECT lpad(state, 2, '0') || lpad(county, 3, '0') AS county_fips,
+         name,
+         b01003_001e AS pop_total,
+         b19013_001e AS median_hh_income,
+         (SELECT sum(core.num(v)) FROM unnest(ARRAY[
+            b01001_020e, b01001_021e, b01001_022e, b01001_023e, b01001_024e, b01001_025e,
+            b01001_044e, b01001_045e, b01001_046e, b01001_047e, b01001_048e, b01001_049e]) AS v
+         )::text AS pop_65p
+  FROM raw.acs_county
+)
 SELECT a.county_fips,
        a.name                                   AS county_name,
        left(a.county_fips, 2)                   AS state_fips,
@@ -31,7 +53,7 @@ SELECT a.county_fips,
        NULLIF(core.num(s.rpl_theme2), -999)     AS svi_household,
        NULLIF(core.num(s.rpl_theme3), -999)     AS svi_minority_language,
        NULLIF(core.num(s.rpl_theme4), -999)     AS svi_housing_transport
-FROM raw.acs_county a
+FROM acs a
 LEFT JOIN raw.svi_county s ON lpad(s.fips, 5, '0') = a.county_fips;
 ALTER TABLE core.county ADD PRIMARY KEY (county_fips);
 
@@ -102,6 +124,29 @@ CREATE INDEX ON core.prescriber (county_fips);
 CREATE INDEX ON core.prescriber (specialty);
 
 -- ---------------------------------------------------------------------
+-- COMPANY MAP: every manufacturer string in either source -> parent.
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS core.company_map CASCADE;
+CREATE TABLE core.company_map AS
+WITH names AS (
+  SELECT DISTINCT 'op'::text AS source,
+         applicable_manufacturer_or_applicable_gpo_making_payment_name AS name
+  FROM raw.op_general
+  UNION
+  SELECT DISTINCT 'partd', mftr_name FROM raw.partd_spend_drug WHERE mftr_name <> 'Overall'
+)
+SELECT n.source, n.name, m.parent IS NOT NULL AS mapped,
+       coalesce(m.parent, core.norm_name(n.name)) AS parent
+FROM names n
+LEFT JOIN LATERAL (
+  SELECT cp.parent FROM ref.company_parent cp
+  WHERE core.norm_name(n.name) ~ cp.pattern
+  ORDER BY cp.priority, length(cp.pattern) DESC LIMIT 1
+) m ON true
+WHERE core.norm_name(n.name) IS NOT NULL;
+ALTER TABLE core.company_map ADD PRIMARY KEY (source, name);
+
+-- ---------------------------------------------------------------------
 -- DRUG DIMENSION (all products, automatic tier)
 -- brand_key = normalised Part D brand name, or 'HCPCS:<code>' for Part B.
 -- Manufacturer comes free from Part D Spending by Drug; class from FDA EPC.
@@ -117,11 +162,13 @@ WITH partd AS (
   FROM raw.partd_prov_drug GROUP BY 1
 ),
 mfr AS (   -- per-manufacturer rows only (the file also has an 'Overall' row)
-  SELECT core.norm_name(brnd_name) AS brand_key,
-         string_agg(DISTINCT mftr_name, '; ' ORDER BY mftr_name) AS manufacturer,
-         count(DISTINCT mftr_name) AS n_manufacturers
-  FROM raw.partd_spend_drug
-  WHERE mftr_name <> 'Overall'
+  SELECT core.norm_name(s.brnd_name) AS brand_key,
+         string_agg(DISTINCT s.mftr_name, '; ' ORDER BY s.mftr_name) AS manufacturer,
+         count(DISTINCT s.mftr_name) AS n_manufacturers,
+         string_agg(DISTINCT cm.parent, '; ' ORDER BY cm.parent) AS parent_company
+  FROM raw.partd_spend_drug s
+  LEFT JOIN core.company_map cm ON cm.source = 'partd' AND cm.name = s.mftr_name
+  WHERE s.mftr_name <> 'Overall'
   GROUP BY 1
 ),
 epc AS (   -- FDA Established Pharmacologic Class by generic name
@@ -138,7 +185,7 @@ partb AS (
 )
 SELECT p.brand_key, p.brand_name, p.generic_name, p.is_generic,
        'D'::text AS benefit,
-       m.manufacturer, m.n_manufacturers,
+       m.manufacturer, m.n_manufacturers, m.parent_company,
        trim(e.epc_class) AS epc_class,
        (SELECT a.product_id FROM ref.product_alias a
          WHERE a.source = 'partd_brand'
@@ -148,7 +195,7 @@ FROM partd p
 LEFT JOIN mfr m ON m.brand_key = p.brand_key
 LEFT JOIN epc e ON e.generic_key = core.norm_name(p.generic_name)
 UNION ALL
-SELECT b.brand_key, b.brand_name, b.generic_name, b.is_generic, 'B', NULL, NULL, NULL,
+SELECT b.brand_key, b.brand_name, b.generic_name, b.is_generic, 'B', NULL, NULL, NULL, NULL,
        (SELECT a.product_id FROM ref.product_alias a
          WHERE a.source = 'partb_hcpcs' AND a.alias = substr(b.brand_key, 7) LIMIT 1)
 FROM partb b;

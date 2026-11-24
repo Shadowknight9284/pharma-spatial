@@ -23,13 +23,16 @@ FROM mart.targeting_index t JOIN core.county c USING (county_fips)
 WHERE t.class_id = 'DOAC' AND left(t.county_fips, 2) IN ('34', '36', '42')
 GROUP BY 1, 2 ORDER BY xarelto_pct DESC NULLS LAST;
 
--- Q3. Most over-targeted counties per company (promo share >> sales share)
+-- Q3. Most over-targeted counties per product (promo share >> sales share).
+-- Ranked on the smoothed ratio, cells with enough evidence only (see 30_mart.sql).
 SELECT company, product_id, county_fips,
-       round(targeting_vs_sales, 2) AS targeting_vs_sales, round(pay_usd) AS pay_usd
+       round(targeting_vs_sales_sm, 2) AS targeting_vs_sales_sm,
+       round(targeting_vs_sales, 2)    AS raw_ratio,
+       round(pay_usd) AS pay_usd, round(n_payments) AS n_payments, round(fills_30d) AS fills_30d
 FROM (
-  SELECT t.*, row_number() OVER (PARTITION BY product_id ORDER BY targeting_vs_sales DESC) AS rk
+  SELECT t.*, row_number() OVER (PARTITION BY product_id ORDER BY targeting_vs_sales_sm DESC) AS rk
   FROM mart.targeting_index t
-  WHERE n_prescribers >= 5 AND pay_usd > 1000
+  WHERE enough_evidence
 ) x WHERE rk <= 5 ORDER BY company, product_id, rk;
 
 -- Q4. Does promotion follow social vulnerability? (correlation by product)
@@ -41,11 +44,15 @@ FROM mart.v_model_input
 WHERE burden > 0
 GROUP BY product_id ORDER BY product_id;
 
--- Q5. Company footprint (auto tier, all brands): top manufacturers by county count
-SELECT manufacturer, count(DISTINCT county_fips) AS counties,
-       round(sum(gross_cost) / 1e9, 2) AS gross_cost_busd, round(sum(pay_usd) / 1e6, 2) AS promo_musd
-FROM mart.company_county_year
-GROUP BY 1 ORDER BY gross_cost_busd DESC LIMIT 25;
+-- Q5. Parent-company footprint (auto tier, all brands): sales vs promotion
+SELECT parent_company, n_brands,
+       round(gross_cost / 1e9, 2)     AS gross_cost_busd,
+       round(promo_drug_usd / 1e6, 2) AS promo_drug_musd,
+       round(promo_all_usd / 1e6, 2)  AS promo_all_musd,
+       n_paying_entities,
+       round(promo_per_1k_gross, 2)   AS promo_per_1k_gross
+FROM mart.parent_company_year
+ORDER BY gross_cost DESC NULLS LAST LIMIT 25;
 
 -- Q6. HCP-level: payments vs prescribing for one product (input to a response model)
 -- Part D lists brand variants separately ('DUPIXENT PEN', 'DUPIXENT SYRINGE'),

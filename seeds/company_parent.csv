@@ -1,0 +1,59 @@
+pattern,parent,priority,note
+^(BMS|BRISTOL|E\.R\. SQUIBB|CELGENE|MYOKARDIA|RECEPTOS|KARUNA|MIRATI),Bristol Myers Squibb,10,"OP pays mostly as E.R. Squibb & Sons; Part D 'BMS PRIMARYCARE', 'CELGENE/BMS'"
+^(PFIZER|PHARMACIA & UPJOHN|WYETH|HOSPIRA|SEAGEN|ARRAY|BIOHAVEN|ARENA|GLOBAL BLOOD|SEAGEN/PFIZER|ARRAY/PFIZER|BIOHAVEN/PFIZER),Pfizer,10,Seagen closed Dec 2023
+^(SANOFI|GENZYME|KADMON|BIOVERATIV|PROVENTION),Sanofi,10,Genzyme is Sanofi's main specialty-care reporter in OP
+^REGENERON,Regeneron,10,Co-promotes Dupixent with Sanofi; kept separate
+^(ELI LILLY|LILLY),Eli Lilly,10,
+^(BOEHRINGER),Boehringer Ingelheim,10,
+^NOVO NORDISK,Novo Nordisk,10,
+^(ASTRAZENECA|ALEXION|MEDIMMUNE),AstraZeneca,10,'ASTRAZENECA/PRA' too
+^(GLAXOSMITHKLINE|GSK|VIIV|TESARO|STIEFEL),GSK,10,ViiV is majority GSK-owned
+^(JANSSEN|ACTELION|DEPUY|MEDICAL DEVICE BUSINESS SERVICES|ETHICON|ABIOMED|SHOCKWAVE|JOHNSON & JOHNSON|BIOSENSE WEBSTER|AURIS),Johnson & Johnson,10,Shockwave closed May 2024; Intra-Cellular (2025) deliberately not mapped
+^(NOVARTIS|ADVANCED ACCELERATOR APPLICATIONS|AVEXIS),Novartis,10,Sandoz spun off Oct 2023 -> own parent
+^(GENENTECH|ROCHE|HOFFMANN|SPARK THERAPEUTICS|FOUNDATION MEDICINE),Roche,10,
+^(ABBVIE|ALLERGAN|PHARMACYCLICS|CERECEL|IMMUNOGEN|CORDAVIS),AbbVie,10,'ABBVIE US LLC; CORDAVIS' too
+^(MERCK SHARP|MERCK & CO),Merck & Co.,10,Organon spun off 2021 -> own parent
+^(EMD SERONO|MERCK KGAA),Merck KGaA,10,
+^(AMGEN|HORIZON),Amgen,10,Horizon closed Oct 2023
+^(TAKEDA|SHIRE|BAXALTA|MILLENNIUM),Takeda,10,
+^(GILEAD|KITE),Gilead,10,
+^(BAYER|ASKLEPIOS),Bayer,10,AskBio (Asklepios) is a Bayer subsidiary
+^(TEVA),Teva,10,
+^(OTSUKA),Otsuka,10,
+^(ASTELLAS),Astellas,10,
+^(BIOGEN|REATA),Biogen,10,Reata closed Sep 2023
+^(SALIX|BAUSCH HEALTH|VALEANT),Bausch Health,10,
+^(BAUSCH & LOMB|BAUSCH \+ LOMB),Bausch + Lomb,10,
+^(MYLAN|VIATRIS|PHARMACIA-UPJHN|UPJOHN|BIOCON),Viatris,10,Biocon Biologics markets Semglee (ex-Viatris)
+^(CSL),CSL,10,
+^(UCB),UCB,10,
+^(DAIICHI),Daiichi Sankyo,10,
+^(EISAI),Eisai,10,
+^(SUMITOMO|SUNOVION),Sumitomo Pharma,10,
+^(VERTEX),Vertex,10,
+^(INCYTE),Incyte,10,
+^(NEUROCRINE),Neurocrine,10,
+^(ALNYLAM),Alnylam,10,
+^(JAZZ),Jazz,10,
+^(LUNDBECK),Lundbeck,10,
+^(IPSEN),Ipsen,10,
+^(CHIESI),Chiesi,10,
+^(BEIGENE),BeiGene,10,
+^(ARGENX),argenx,10,
+^(UNITED THERAP),United Therapeutics,10,
+^(MALLINCK),Mallinckrodt,10,
+^(SUN PHARMA),Sun Pharma,10,
+^(ALKERMES),Alkermes,10,
+^(ORGANON),Organon,20,
+^(SANDOZ),Sandoz,20,
+^(MEDTRONIC|COVIDIEN),Medtronic,10,
+^(STRYKER),Stryker,10,
+^(ZIMMER BIOMET),Zimmer Biomet,10,
+^(BOSTON SCIENTIFIC),Boston Scientific,10,
+^(ABBOTT),Abbott,10,
+^(SMITH\+NEPHEW|SMITH & NEPHEW|SMITH&N),Smith+Nephew,10,
+^(BECTON|BD |BARD|DAVOL|C\. R\. BARD),Becton Dickinson,10,
+^(ALCON),Alcon,10,
+^(ENCORE MEDICAL|DJO|ENOVIS),Enovis,10,
+^(LINVATEC|CONMED),CONMED,10,
+^(SIEMENS MEDICAL|SIEMENS HEALTHINEERS),Siemens Healthineers,10,

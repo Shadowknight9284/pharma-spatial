@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pharma Spatial</title>
+  <meta name="description" content="Where pharma companies promote, where their products sell, and how both line up with disease burden — U.S. counties, Medicare Part D/B and CMS Open Payments.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Pharma Spatial</h1>
+      <p class="sub">Promotion, sales and disease burden across U.S. counties · <span id="year">2024</span></p>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="map" aria-selected="true">Map</button>
+      <button role="tab" data-tab="companies">Companies</button>
+      <button role="tab" data-tab="indications">Indications</button>
+      <button role="tab" data-tab="about">About the data</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- MAP ---------------------------------------------------------- -->
+    <section id="tab-map" class="tab on">
+      <div class="controls">
+        <label>Product
+          <select id="product"></select>
+        </label>
+        <label>Color counties by
+          <select id="metric"></select>
+        </label>
+        <label class="check"><input type="checkbox" id="evidence" checked> Hide thin cells</label>
+      </div>
+      <p id="metric-help" class="help"></p>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="map-wrap">
+        <div class="map-box">
+          <svg id="map" role="img" aria-label="County choropleth map"></svg>
+          <div id="legend" class="legend"></div>
+          <div id="tip" class="tip" hidden></div>
+        </div>
+        <aside id="detail" class="detail">
+          <p class="muted">Click a county for details.</p>
+        </aside>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h2>Promotion share vs sales share</h2>
+          <p class="help">Each dot is a county. On the diagonal, a county gets the same share of the product's
+            payments as of its fills. Above it: promoted more than its sales predict. Log scales.</p>
+          <svg id="scatter" role="img" aria-label="Scatter of promotion share versus sales share"></svg>
+        </div>
+        <div class="card">
+          <h2>Most over-promoted counties</h2>
+          <p class="help">Smoothed promotion ÷ sales ratio, counties with ≥10 payments and ≥120 fills.</p>
+          <table id="top" class="tbl"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPANIES ---------------------------------------------------- -->
+    <section id="tab-companies" class="tab">
+      <div class="card">
+        <h2>Parent companies: Medicare sales vs HCP promotion</h2>
+        <p class="help">x: Part D + Part B gross drug cost of brands the company manufactures (pre-rebate).
+          y: Open Payments general payments by any of the company's legal entities that were matched to a drug.
+          Dot size: number of HCPs paid. Log scales.</p>
+        <svg id="co-scatter" role="img" aria-label="Company scatter"></svg>
+      </div>
+      <div class="card">
+        <table id="co-table" class="tbl sortable"></table>
+      </div>
+    </section>
+
+    <!-- INDICATIONS -------------------------------------------------- -->
+    <section id="tab-indications" class="tab">
+      <div class="controls">
+        <label>Measure
+          <select id="ind-measure">
+            <option value="fills_30d">30-day fills</option>
+            <option value="gross_cost">Gross cost</option>
+            <option value="pay_usd">Promotion $</option>
+          </select>
+        </label>
+      </div>
+      <div class="card">
+        <h2>How each product splits across indications</h2>
+        <p class="help">Part D has no diagnoses, so indication is inferred from prescriber specialty
+          (e.g. a dermatologist's Dupixent fill → atopic dermatitis). Split rules are in
+          <code>seeds/specialty_indication.csv</code>.</p>
+        <div id="ind-chart"></div>
+      </div>
+    </section>
+
+    <!-- ABOUT -------------------------------------------------------- -->
+    <section id="tab-about" class="tab prose">
+      <h2>What this is</h2>
+      <p>A public-data pipeline (Postgres + PostGIS) that builds a company × product × indication × prescriber ×
+        county × year cube from CMS Medicare Part D and Part B prescriber files, CMS Open Payments, NPPES,
+        FDA NDC, CDC PLACES, CDC SVI and the Census ACS. This site shows county- and company-level aggregates
+        only; no individual prescribers are named.</p>
+
+      <h2>Metrics</h2>
+      <dl>
+        <dt>Fills per 1,000 aged 65+</dt><dd>Part D 30-day-equivalent fills ÷ county population 65+ (ACS 5-year).</dd>
+        <dt>Promotion $</dt><dd>Open Payments general payments (meals, speaker fees, travel, consulting…) naming the
+          product. A payment naming several products is split equally.</dd>
+        <dt>Promotion vs sales</dt><dd>County share of the product's national payments ÷ its share of national fills,
+          smoothed toward 1 by adding 1% of the product's national payments to both sides. &gt;1 means promoted more than
+          its sales would predict.</dd>
+        <dt>Promotion vs burden</dt><dd>Same, against the county's share of disease burden (CDC PLACES prevalence ×
+          population; 65+ population where PLACES has no matching measure).</dd>
+        <dt>Share of class</dt><dd>Product's share of 30-day fills within its competitive class in that county.</dd>
+      </dl>
+
+      <h2>Caveats</h2>
+      <ul>
+        <li>Medicare only (mostly 65+); no commercial or Medicaid prescriber-level data exists publicly.</li>
+        <li>CMS suppresses prescriber×drug cells under 11 claims: rural HCPs and new or rare drugs are undercounted
+          (Dupixent's prescriber file covers ~83% of its Part D spend; Eliquis ~96%).</li>
+        <li>Indication is inferred from specialty, not observed.</li>
+        <li>Gross cost is before rebates. Open Payments excludes rep salaries, samples and DTC advertising.</li>
+        <li>Promotion targets high prescribers, so none of these associations are causal.</li>
+        <li>Puerto Rico and the territories are in the data but not drawn on the map.</li>
+      </ul>
+
+      <h2>Data-quality checks (this build)</h2>
+      <table id="qa" class="tbl"></table>
+      <p class="muted" id="built"></p>
+      <p><a href="https://github.com/Shadowknight9284/pharma-spatial">Source code on GitHub</a></p>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -30,6 +30,15 @@ FROM (VALUES
   ('pct curated fills allocated by specialty',
      (SELECT round(100.0 * sum(fills_30d) FILTER (WHERE alloc_rule = 'specialty') / NULLIF(sum(fills_30d),0), 2)
       FROM mart.npi_product_indication WHERE year = core.cur_year())),
+  ('pct OP $ from entities mapped to a parent',
+     (SELECT round(100.0 * sum(f.amount_alloc) FILTER (WHERE cm.mapped) / NULLIF(sum(f.amount_alloc),0), 2)
+      FROM core.payment_fact f JOIN core.company_map cm ON cm.source = 'op' AND cm.name = f.manufacturer
+      WHERE f.year = core.cur_year())),
+  ('pct branded Part D cost w/ mapped parent',
+     (SELECT round(100.0 * sum(r.gross_cost) FILTER (WHERE d.parent_company IN (SELECT parent FROM ref.company_parent))
+                  / NULLIF(sum(r.gross_cost),0), 2)
+      FROM core.rx_fact r JOIN core.drug d USING (brand_key)
+      WHERE r.year = core.cur_year() AND r.benefit = 'D' AND NOT d.is_generic)),
   ('specialty weights not summing to 1',
      (SELECT count(*) FROM (SELECT product_id, prscrbr_type FROM ref.specialty_indication
                             GROUP BY 1,2 HAVING abs(sum(weight) - 1) > 0.001) x))
@@ -62,3 +71,16 @@ SELECT product_id, specialty, round(sum(fills_30d)) AS fills_30d
 FROM mart.npi_product_indication
 WHERE alloc_rule <> 'specialty'
 GROUP BY 1, 2 ORDER BY fills_30d DESC NULLS LAST;
+
+-- 4) Biggest paying entities / manufacturers with no parent rule
+DROP VIEW IF EXISTS qa.v_unmapped_companies;
+CREATE VIEW qa.v_unmapped_companies AS
+SELECT 'op' AS source, f.manufacturer AS name, round(sum(f.amount_alloc)) AS usd
+FROM core.payment_fact f JOIN core.company_map cm ON cm.source = 'op' AND cm.name = f.manufacturer
+WHERE NOT cm.mapped GROUP BY 1, 2
+UNION ALL
+SELECT 'partd', d.manufacturer, round(sum(r.gross_cost))
+FROM core.rx_fact r JOIN core.drug d USING (brand_key)
+JOIN core.company_map cm ON cm.source = 'partd' AND cm.name = d.manufacturer
+WHERE NOT cm.mapped AND NOT d.is_generic GROUP BY 1, 2
+ORDER BY usd DESC NULLS LAST;

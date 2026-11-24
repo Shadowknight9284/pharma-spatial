@@ -28,6 +28,7 @@ SEEDS = {   # parent tables first (foreign keys)
     "product_alias.csv": "ref.product_alias",
     "specialty_indication.csv": "ref.specialty_indication",
     "indication_measure.csv": "ref.indication_measure",
+    "company_parent.csv": "ref.company_parent",
 }
 
 

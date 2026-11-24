@@ -53,3 +53,15 @@ CREATE TABLE IF NOT EXISTS ref.indication_measure (
   places_measure_id  text,
   note               text
 );
+
+-- Legal entity -> parent company, as of the data year. Open Payments names
+-- the paying entity ('E.R. Squibb & Sons', 'Genzyme'); Part D Spending by Drug
+-- gives a 15-char truncated manufacturer ('BMS PRIMARYCARE'). pattern is a
+-- POSIX regex matched against core.norm_name(name); lowest priority wins.
+-- Unmatched names are their own parent (see qa.v_unmapped_companies).
+CREATE TABLE IF NOT EXISTS ref.company_parent (
+  pattern   text PRIMARY KEY,
+  parent    text NOT NULL,
+  priority  int  NOT NULL DEFAULT 100,
+  note      text
+);

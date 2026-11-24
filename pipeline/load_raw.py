@@ -21,7 +21,7 @@ from pathlib import Path
 import pandas as pd
 import psycopg
 
-from .sources import ACS_VARS, SOURCES
+from .sources import SOURCES
 
 DATA = Path(os.environ.get("PHARMA_DATA_DIR", "data"))
 DSN = os.environ.get("PHARMA_DSN", "postgresql://pharma:pharma@localhost:5432/pharma")
@@ -81,14 +81,11 @@ def load_table(conn, fh, table: str, sep=",", encoding="utf-8", usecols=None):
 
 
 def load_acs(conn, path: Path):
-    df = pd.read_csv(path, dtype=str)
-    df = df.rename(columns=ACS_VARS)
-    df["county_fips"] = df["state"] + df["county"]
-    m = [c for c in df.columns if c.startswith(("m65_", "f65_"))]
-    df["pop_65p"] = df[m].apply(pd.to_numeric, errors="coerce").sum(axis=1).astype("int64").astype(str)
-    df = df[["county_fips", "NAME", "pop_total", "pop_65p", "median_hh_income"]]
-    buf = io.BytesIO(df.to_csv(index=False).encode())
-    return load_table(conn, buf, "acs_county")
+    """ACS county extract (Census API shape: NAME, B01001_020E..., state, county).
+    Loaded as-is like every other source; FIPS, renames and the 65+ sum
+    happen in sql/20_core.sql."""
+    with path.open("rb") as fh:
+        return load_table(conn, fh, "acs_county")
 
 
 def main(argv=None):
