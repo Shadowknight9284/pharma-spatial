@@ -30,3 +30,13 @@ FARXIGA,Cardiology,heart_failure,1
 FARXIGA,Nephrology,ckd,1
 FARXIGA,*,t2d,1
 INVOKANA,*,t2d,1
+DUPIXENT,Critical Care (Intensivists),asthma,0.5
+DUPIXENT,Critical Care (Intensivists),copd,0.5
+NUCALA,Critical Care (Intensivists),asthma,1
+XOLAIR,Pulmonary Disease,asthma,1
+JARDIANCE,Interventional Cardiology,heart_failure,1
+JARDIANCE,Clinical Cardiac Electrophysiology,heart_failure,1
+JARDIANCE,Advanced Heart Failure and Transplant Cardiology,heart_failure,1
+FARXIGA,Interventional Cardiology,heart_failure,1
+FARXIGA,Clinical Cardiac Electrophysiology,heart_failure,1
+FARXIGA,Advanced Heart Failure and Transplant Cardiology,heart_failure,1
