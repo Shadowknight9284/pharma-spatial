@@ -17,6 +17,7 @@
       <button role="tab" data-tab="map" aria-selected="true">Map</button>
       <button role="tab" data-tab="companies">Companies</button>
       <button role="tab" data-tab="indications">Indications</button>
+      <button role="tab" data-tab="models">Models</button>
       <button role="tab" data-tab="about">About the data</button>
     </nav>
   </header>
@@ -94,6 +95,36 @@
           (e.g. a dermatologist's Dupixent fill → atopic dermatitis). Split rules are in
           <code>seeds/specialty_indication.csv</code>.</p>
         <div id="ind-chart"></div>
+      </div>
+    </section>
+
+    <!-- MODELS ------------------------------------------------------- -->
+    <section id="tab-models" class="tab">
+      <p class="help">Three regressions on the same data. All are cross-sectional associations: companies pay the
+        prescribers and places that already prescribe the most, so none is a causal effect of promotion.
+        Full tables: <code>analysis/results/models.md</code>.</p>
+      <div class="card">
+        <h2>1 · Paid prescribers write more of the promoted product</h2>
+        <p class="help">Difference in the product's share of the prescriber's class fills (percentage points),
+          paid vs unpaid prescribers of the <b>same specialty in the same county</b>, controlling for class
+          volume and rival promotion. Bars: 95% CI, clustered by county.</p>
+        <svg id="m1" role="img" aria-label="Prescriber-level coefficients"></svg>
+        <p class="help" id="m1-note"></p>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h2>2 · Share of voice vs share of market</h2>
+          <p class="help">Within a class, points of fill share per point of promotion share, across counties
+            (product and county fixed effects).</p>
+          <svg id="m2" role="img" aria-label="Share of voice coefficients"></svg>
+        </div>
+        <div class="card">
+          <h2>3 · What promotion tracks beyond sales</h2>
+          <p class="help">County promotion per 1,000 aged 65+, spatial lag model. Standardised effects of disease
+            burden and SVI, holding sales, income and population fixed.</p>
+          <table id="m3" class="tbl"></table>
+          <p class="help" id="m3-note"></p>
+        </div>
       </div>
     </section>
 

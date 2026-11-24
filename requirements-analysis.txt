@@ -4,3 +4,4 @@ statsmodels>=0.14
 libpysal>=4.10
 esda>=2.5
 spreg>=1.5
+pyfixest>=0.25

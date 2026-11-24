@@ -91,6 +91,28 @@ Preview locally with `python -m http.server -d web 8000`. To publish, enable Git
 (Settings → Pages → Source: GitHub Actions), then run the `pages` workflow
 (`.github/workflows/pages.yml`, manual trigger) to deploy `web/`.
 
+## Models
+
+```bash
+pip install -r requirements-analysis.txt
+python -m analysis.models --year 2024   # ~10 s; needs `sql` (builds mart.npi_class_product)
+pytest tests/                           # offline source-discovery tests
+```
+
+`analysis/models.py` writes `analysis/results/models.md` and `web/data/models.json` (Models tab).
+
+| | Question | Design |
+|---|---|---|
+| M1 | Do prescribers paid for a product write more of it? | Prescriber x product within class; share of class fills ~ paid, with specialty + county fixed effects, class volume, rival payments; SEs clustered by county (pyfixest) |
+| M2 | Does share of voice track share of market? | County x product; fill share ~ promotion share, product + county fixed effects |
+| M3 | What does promotion track beyond sales? | County x class; promotion per 65+ ~ sales, disease burden, SVI, income, population; OLS + spatial lag (PySAL spreg, 6-NN weights), Moran's I |
+
+2024 headline: paid prescribers have a higher share of the promoted product than same-specialty,
+same-county peers (Farxiga +15 pp, Dupixent +8, Xarelto +3, Eliquis +2, Jardiance ~0); rival
+promotion goes with lower share; county promotion follows sales and population, with disease burden
+adding a little only for SGLT2s and SVI adding nothing. All cross-sectional associations, not causal
+effects: a second year (lagged payments, within-prescriber change) is the next step.
+
 ## Two tiers
 
 * **Auto tier**: every Part D brand. Company comes from CMS Part D Spending by Drug,

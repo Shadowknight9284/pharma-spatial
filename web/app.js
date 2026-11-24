@@ -57,7 +57,8 @@ Promise.all([
   d3.json(D + "meta.json"), d3.json(D + "county_base.json"),
   d3.json(D + "counties.geojson"), d3.json(D + "states.geojson"),
   d3.json(D + "indications.json"), d3.json(D + "companies.json"),
-]).then(([meta, base, geo, states, ind, cos]) => {
+  d3.json(D + "models.json").catch(() => null),
+]).then(([meta, base, geo, states, ind, cos, models]) => {
   S.meta = meta; S.base = base;
   base.fips.forEach((f, i) => S.baseIdx.set(f, i));
   geo.features = geo.features.filter(f => !NON_CONUS_SKIP.has(f.id.slice(0, 2)));
@@ -65,6 +66,7 @@ Promise.all([
   S.geo = geo; S.states = states;
   d3.select("#year").text(meta.year);
   initTabs(); initControls(); initMap(); renderAbout(); renderCompanies(cos); renderIndications(ind);
+  if (models) S.models = models; else d3.select('[data-tab="models"]').remove();
   selectProduct(meta.products.find(p => p.id === "DUPIXENT") ? "DUPIXENT" : meta.products[0].id);
 }).catch(err => {
   d3.select("main").insert("p", ":first-child").attr("class", "card")
@@ -76,6 +78,12 @@ function initTabs() {
     const t = this.dataset.tab;
     d3.selectAll(".tabs button").attr("aria-selected", function () { return this.dataset.tab === t; });
     d3.selectAll(".tab").classed("on", function () { return this.id === "tab-" + t; });
+    if (t === "models" && S.models) renderModels(S.models);   // needs a visible container to measure
+  });
+  let rz;
+  window.addEventListener("resize", () => {
+    clearTimeout(rz);
+    rz = setTimeout(() => { if (S.models && d3.select("#tab-models").classed("on")) renderModels(S.models); }, 150);
   });
 }
 
@@ -373,6 +381,54 @@ function renderIndications(ind) {
   // products list comes from meta; wait until it's set
   const wait = () => S.meta ? draw() : setTimeout(wait, 50);
   wait();
+}
+
+// ---------------------------------------------------------------- models
+function coefPlot(sel, rows, { label, est, lo, hi, unit }) {
+  const W = Math.max(300, d3.select(sel).node().parentNode.getBoundingClientRect().width - 32);
+  const rowH = 36, m = { t: 12, r: 64, b: 34, l: 96 }, H = m.t + m.b + rowH * rows.length;
+  const svg = d3.select(sel).attr("viewBox", [0, 0, W, H]).attr("width", W).attr("height", H).html("");
+  const ext = d3.extent([0, ...rows.flatMap(r => [r[lo], r[hi]])]);
+  const x = d3.scaleLinear().domain(ext).nice().range([m.l, W - m.r]);
+  const y = d3.scaleBand().domain(rows.map(r => r[label])).range([m.t, H - m.b]).padding(0.4);
+  svg.append("g").attr("class", "axis grid").attr("transform", `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).ticks(W < 500 ? 4 : 7).tickSize(-(H - m.t - m.b)).tickFormat(v => (v > 0 ? "+" : "") + v + unit));
+  svg.append("line").attr("class", "diag").attr("x1", x(0)).attr("x2", x(0)).attr("y1", m.t).attr("y2", H - m.b);
+  const g = svg.append("g").selectAll("g").data(rows).join("g")
+    .attr("transform", r => `translate(0,${y(r[label]) + y.bandwidth() / 2})`);
+  g.append("text").attr("class", "lbl").attr("x", m.l - 10).attr("y", 4).attr("text-anchor", "end").text(r => r[label]);
+  g.append("line").attr("x1", r => x(r[lo])).attr("x2", r => x(r[hi])).attr("stroke", "var(--accent)").attr("stroke-width", 3).attr("stroke-linecap", "round");
+  g.append("circle").attr("cx", r => x(r[est])).attr("r", 6).attr("fill", "var(--accent)").attr("stroke", "var(--panel)").attr("stroke-width", 2);
+  g.append("text").attr("class", "lbl").attr("x", r => x(r[hi]) + 8).attr("y", 4)
+    .text(r => (r[est] > 0 ? "+" : "") + r[est].toFixed(unit === " pp" ? 1 : 2) + unit);
+}
+
+function renderModels(M) {
+  const brand = id => (S.meta.products.find(p => p.id === id) || { brand: id }).brand;
+  coefPlot("#m1", M.m1.map(r => ({ ...r, name: brand(r.product) })),
+    { label: "name", est: "paid_pp", lo: "paid_lo", hi: "paid_hi", unit: " pp" });
+  const top = [...M.m1].sort((a, b) => b.paid_pp - a.paid_pp)[0];
+  d3.select("#m1-note").text(
+    `Largest gap: ${brand(top.product)}, +${top.paid_pp.toFixed(1)} points of class share among paid prescribers. ` +
+    `Payments naming a rival go with a lower share for every product (e.g. ` +
+    M.m1.map(r => `${brand(r.product)} ${r.rival_pp_per_log.toFixed(1)}`).join(", ") + " pp per log $).");
+  const cls = c => (S.meta.products.find(p => p.class === c) || { class_name: c }).class_name;
+  const short = { DOAC: "DOACs", SGLT2: "SGLT2", T2_BIOLOGIC: "T2 biologics", BASAL_INSULIN: "Basal insulin" };
+  coefPlot("#m2", M.m2.map(r => ({ ...r, name: short[r.class] || r.class })),
+    { label: "name", est: "beta", lo: "lo", hi: "hi", unit: "" });
+  const t = d3.select("#m3").html("");
+  t.append("thead").append("tr").selectAll("th")
+    .data(["Class", "Burden (z)", "SVI (z)", "Sales elasticity", "Spatial ρ"]).join("th").text(d => d);
+  const cell = (b, se) => {
+    const sig = Math.abs(b / se) > 1.96;
+    const v = Math.abs(b) < 0.005 ? "0.00" : (b > 0 ? "+" : "") + b.toFixed(2);
+    return `<td${sig ? "" : ' class="muted"'}>${v}${sig ? "" : " ns"}</td>`;
+  };
+  t.append("tbody").selectAll("tr").data(M.m3).join("tr").html(r =>
+    `<td>${cls(r.class)}</td>${cell(r.coef.prev_z.lag, r.coef.prev_z.lag_se)}${cell(r.coef.svi_z.lag, r.coef.svi_z.lag_se)}` +
+    `${cell(r.coef.log_fills_pc.lag, r.coef.log_fills_pc.lag_se)}${cell(r.rho, r.rho_se)}`);
+  d3.select("#m3-note").text("Coefficients on log promotion per 1,000 aged 65+. ns = not significant at 5%. " +
+    "Burden: diabetes (SGLT2), coronary heart disease (DOAC, AF is not in PLACES), asthma (T2 biologics).");
 }
 
 // ---------------------------------------------------------------- about
