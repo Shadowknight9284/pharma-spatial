@@ -47,8 +47,15 @@ SELECT manufacturer, count(DISTINCT county_fips) AS counties,
 FROM mart.company_county_year
 GROUP BY 1 ORDER BY gross_cost_busd DESC LIMIT 25;
 
--- Q6. HCP-level: payments vs prescribing for one brand (input to a response model)
-SELECT n.npi, p.specialty, p.county_fips, n.trx, n.fills_30d, n.pay_usd, n.n_meals
-FROM mart.npi_brand_year n JOIN core.prescriber p USING (npi)
-WHERE n.brand_key = 'DUPIXENT'
-ORDER BY n.pay_usd DESC LIMIT 50;
+-- Q6. HCP-level: payments vs prescribing for one product (input to a response model)
+-- Part D lists brand variants separately ('DUPIXENT PEN', 'DUPIXENT SYRINGE'),
+-- so roll up through the curated product_id rather than a single brand_key.
+SELECT n.npi, p.specialty, p.county_fips,
+       sum(n.trx) AS trx, sum(n.fills_30d) AS fills_30d,
+       sum(n.pay_usd) AS pay_usd, sum(n.n_meals) AS n_meals
+FROM mart.npi_brand_year n
+JOIN core.drug d USING (brand_key)
+JOIN core.prescriber p USING (npi)
+WHERE d.product_id = 'DUPIXENT'
+GROUP BY 1, 2, 3
+ORDER BY pay_usd DESC LIMIT 50;
