@@ -7,6 +7,12 @@ services:
       POSTGRES_DB: pharma
     ports: ["5432:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
+    # Docker's default /dev/shm is 64MB; parallel hash joins need far more
+    # ("could not resize shared memory segment ... No space left on device").
+    shm_size: 4gb
+    # raw.* tables are UNLOGGED: they survive a clean shutdown but are
+    # truncated after a crash/SIGKILL, so give Postgres time to stop cleanly.
+    stop_grace_period: 5m
     # Big COPY/aggregate workloads: give Postgres room
     command: >
       postgres -c shared_buffers=2GB -c work_mem=256MB -c maintenance_work_mem=1GB
