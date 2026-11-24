@@ -75,16 +75,72 @@ def ext_for(url: str) -> str:
     return ".csv"
 
 
+ACS_SF = "https://www2.census.gov/programs-surveys/acs/summary_file/{y}/table-based-SF"
+
+
+def _acs_year(year: int) -> int:
+    """Newest ACS 5-year release <= `year` (published ~Dec of year+1)."""
+    for y in range(year, year - 4, -1):
+        r = requests.head(f"{ACS_SF.format(y=y)}/documentation/Geos{y}5YR.txt",
+                          headers=UA, timeout=60, allow_redirects=True)
+        if r.ok:
+            return y
+    raise LookupError(f"No ACS 5-year summary file found for {year} or the 3 years before")
+
+
+def _acs_sf_county_rows(url: str, keep: list[str] | None) -> dict[str, dict]:
+    """Stream a pipe-delimited summary-file table, keep county rows (GEO_ID 0500000USssccc)."""
+    out = {}
+    with requests.get(url, headers=UA, stream=True, timeout=(30, 300)) as r:
+        r.raise_for_status()
+        r.encoding = "utf-8"   # .dat files are served without a charset
+        lines = r.iter_lines(decode_unicode=True)
+        hdr = next(lines).split("|")
+        gi = hdr.index("GEO_ID")   # first column in data tables, mid-row in Geos file
+        for line in lines:
+            if "0500000US" not in line:
+                continue
+            f = line.split("|")
+            if f[gi].startswith("0500000US"):
+                row = dict(zip(hdr, f))
+                out[f[gi]] = {k: row.get(k, "") for k in keep} if keep else row
+    return out
+
+
 def download_acs(year: int, dest: Path) -> Path:
-    """County ACS 5-year estimates via the Census API (key optional)."""
-    acs_year = min(year, 2023)  # ACS 5-yr lags ~2 years; bump when newer is out
-    params = {"get": "NAME," + ",".join(ACS_VARS), "for": "county:*"}
+    """County ACS 5-year estimates.
+
+    With CENSUS_API_KEY: the Census API (the API now rejects keyless calls).
+    Without: the keyless table-based summary files on www2.census.gov.
+    Both write the API's shape: NAME, <ACS_VARS...>, state, county.
+    """
+    acs_year = _acs_year(year)
+    print(f"  ACS 5-year {acs_year}")
     if os.environ.get("CENSUS_API_KEY"):
-        params["key"] = os.environ["CENSUS_API_KEY"]
-    r = requests.get(f"https://api.census.gov/data/{acs_year}/acs/acs5",
-                     params=params, headers=UA, timeout=120)
-    r.raise_for_status()
-    rows = r.json()
+        params = {"get": "NAME," + ",".join(ACS_VARS), "for": "county:*",
+                  "key": os.environ["CENSUS_API_KEY"]}
+        r = requests.get(f"https://api.census.gov/data/{acs_year}/acs/acs5",
+                         params=params, headers=UA, timeout=120)
+        r.raise_for_status()
+        rows = r.json()
+    else:
+        base = ACS_SF.format(y=acs_year)
+        geos = _acs_sf_county_rows(f"{base}/documentation/Geos{acs_year}5YR.txt", ["NAME"])
+        # API var B01001_020E  <->  summary-file column B01001_E020
+        by_table: dict[str, list[str]] = {}
+        for v in ACS_VARS:
+            by_table.setdefault(v.split("_")[0], []).append(v)
+        vals: dict[str, dict] = {g: {} for g in geos}
+        for table, vars_ in by_table.items():
+            sf_cols = {v: f"{table}_E{v.split('_')[1][:3]}" for v in vars_}
+            data = _acs_sf_county_rows(
+                f"{base}/data/5YRData/acsdt5y{acs_year}-{table.lower()}.dat", list(sf_cols.values()))
+            for g, row in data.items():
+                vals.setdefault(g, {}).update({v: row[c] for v, c in sf_cols.items()})
+        rows = [["NAME", *ACS_VARS, "state", "county"]]
+        for g in sorted(geos):
+            fips = g[len("0500000US"):]
+            rows.append([geos[g]["NAME"], *(vals[g].get(v, "") for v in ACS_VARS), fips[:2], fips[2:]])
     dest.parent.mkdir(parents=True, exist_ok=True)
     with dest.open("w", newline="") as f:
         csv.writer(f).writerows(rows)

@@ -32,38 +32,43 @@ def cms_catalog() -> dict:
     return _cms_catalog_cache
 
 
-def cms_csv_url(dataset_title: str, year: int) -> str:
-    """Find the CSV distribution for `dataset_title` whose title mentions `year`.
+def _cms_versions(dataset_title: str) -> list[tuple[str, str]]:
+    """All (date, csv_url) releases of a data.cms.gov dataset, newest first.
 
-    Distribution titles look like
-    'Medicare Part D Prescribers - by Provider and Drug : 2024-12-31'.
+    The DCAT catalog lists each yearly release as its own dataset entry titled
+    '<name> : <YYYY-MM-DD>' (e.g. 'Medicare Part D Prescribers - by Provider
+    and Drug : 2024-12-01'), with a CSV distribution plus API endpoints.
+    Older catalogs used one entry named exactly '<name>'; both are handled.
     """
+    want = dataset_title.strip().lower()
+    out = []
     for ds in cms_catalog()["dataset"]:
-        if ds.get("title", "").strip().lower() != dataset_title.lower():
+        title = ds.get("title", "").strip()
+        base, _, date = title.partition(" : ")
+        if base.strip().lower() != want:
             continue
-        hits = [
-            d for d in ds.get("distribution", [])
-            if d.get("mediaType") == "text/csv"
-            and str(year) in d.get("title", "")
-            and d.get("downloadURL")
-        ]
-        if hits:
-            return hits[0]["downloadURL"]
-        years = sorted({m for d in ds.get("distribution", [])
-                        for m in re.findall(r"(20\d\d)-\d\d-\d\d", d.get("title", ""))})
-        raise LookupError(f"{dataset_title}: no CSV for {year}. Available: {years}")
-    raise LookupError(f"Dataset not found in data.cms.gov catalog: {dataset_title}")
+        for d in ds.get("distribution", []):
+            if d.get("mediaType") == "text/csv" and d.get("downloadURL"):
+                dt = date or (re.findall(r"20\d\d-\d\d-\d\d", d.get("title", "")) or [""])[0]
+                out.append((dt, d["downloadURL"]))
+    if not out:
+        raise LookupError(f"Dataset not found in data.cms.gov catalog: {dataset_title}")
+    return sorted(out, reverse=True)
+
+
+def cms_csv_url(dataset_title: str, year: int) -> str:
+    """CSV for the release whose date falls in `year` (data year, e.g. 2024-12-01)."""
+    versions = _cms_versions(dataset_title)
+    for dt, url in versions:
+        if dt.startswith(str(year)):
+            return url
+    raise LookupError(f"{dataset_title}: no CSV for {year}. "
+                      f"Available: {sorted({dt[:4] for dt, _ in versions})}")
 
 
 def cms_latest_csv_url(dataset_title: str) -> str:
-    """For single-file datasets (e.g. Part D Spending by Drug, wide by year)."""
-    for ds in cms_catalog()["dataset"]:
-        if ds.get("title", "").strip().lower() == dataset_title.lower():
-            csvs = [d for d in ds.get("distribution", [])
-                    if d.get("mediaType") == "text/csv" and d.get("downloadURL")]
-            csvs.sort(key=lambda d: d.get("title", ""), reverse=True)
-            return csvs[0]["downloadURL"]
-    raise LookupError(dataset_title)
+    """Newest release (e.g. Part D Spending by Drug, one wide file covering 5 years)."""
+    return _cms_versions(dataset_title)[0][1]
 
 
 def open_payments_general_url(year: int) -> str:
@@ -86,7 +91,8 @@ def nppes_full_url() -> str:
     """Scrape the NPPES page for the current monthly full replacement file."""
     page = "https://download.cms.gov/nppes/NPI_Files.html"
     html = requests.get(page, headers=UA, timeout=60).text
-    links = re.findall(r'href="([^"]*NPPES_Data_Dissemination_[A-Za-z]+_\d{4}[^"]*\.zip)"', html)
+    # Full monthly file: NPPES_Data_Dissemination_<Month>_<YYYY>[_V2].zip (href quoted ' or ")
+    links = re.findall(r'''href=["']([^"']*NPPES_Data_Dissemination_[A-Za-z]+_\d{4}[^"']*\.zip)["']''', html)
     links = [l for l in links if "weekly" not in l.lower() and "deactivat" not in l.lower()]
     if not links:
         raise LookupError("No NPPES full file link found on " + page)
@@ -105,7 +111,9 @@ def cdc_places_county_url() -> str:
     best = None
     for res in r.json()["results"]:
         name = res["resource"]["name"]
-        m = re.match(r"PLACES: Local Data for Better Health, County Data (\d{4}) release", name)
+        # 2020–2024: 'County Data 2024 release'; 2025+: 'County Data, 2025 release'.
+        # The 'GIS Friendly Format' twins are wide, not long; skip them.
+        m = re.match(r"PLACES: Local Data for Better Health, County Data,? (\d{4}) release", name)
         if m and (best is None or int(m.group(1)) > best[0]):
             best = (int(m.group(1)), res["resource"]["id"])
     if not best:
