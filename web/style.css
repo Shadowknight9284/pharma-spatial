@@ -74,6 +74,8 @@ select {
 #map path.c { stroke: var(--stroke); stroke-width: .25; cursor: pointer; }
 #map path.c:hover, #map path.c.sel { stroke: var(--hover); stroke-width: 1.2; }
 #map path.st { fill: none; stroke: var(--stroke); stroke-width: .9; pointer-events: none; }
+#map rect.inset { fill: none; stroke: var(--muted); stroke-opacity: .5; pointer-events: none; }
+#map text.inset-lbl { fill: var(--muted); font-size: 11px; }
 .legend { padding: 4px 8px 2px; font-size: 12px; color: var(--muted); }
 .legend svg { display: block; max-width: 100%; }
 .legend text { fill: var(--muted); font-size: 11px; }

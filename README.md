@@ -148,4 +148,4 @@ Preview locally with `python -m http.server -d web 8000`. To publish, enable Git
   filter on `enough_evidence` (>= 10 payments and >= 120 fills).
 * Connecticut replaced its 8 counties with 9 planning regions in 2022. ZIPs are mapped to the new
   regions through 2020 towns (`zcta_cousub` + Census `ct_cousub_xwalk`) so CT joins ACS, SVI and TIGER.
-* Puerto Rico and the territories are in the tables but not drawn on the website map (Albers USA).
+* The website draws Puerto Rico as an inset; other territories have no ACS/PLACES coverage and are not drawn.

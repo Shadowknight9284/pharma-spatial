@@ -30,7 +30,7 @@ FROM (VALUES
   ('pct curated fills allocated by specialty',
      (SELECT round(100.0 * sum(fills_30d) FILTER (WHERE alloc_rule = 'specialty') / NULLIF(sum(fills_30d),0), 2)
       FROM mart.npi_product_indication WHERE year = core.cur_year())),
-  ('pct OP $ from entities mapped to a parent',
+  ('pct OP $ from entities with an explicit parent rule (rest are standalone)',
      (SELECT round(100.0 * sum(f.amount_alloc) FILTER (WHERE cm.mapped) / NULLIF(sum(f.amount_alloc),0), 2)
       FROM core.payment_fact f JOIN core.company_map cm ON cm.source = 'op' AND cm.name = f.manufacturer
       WHERE f.year = core.cur_year())),

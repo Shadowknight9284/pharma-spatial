@@ -174,7 +174,7 @@ DROP TABLE IF EXISTS mart.county_product_indication CASCADE;
 CREATE TABLE mart.county_product_indication AS
 WITH agg AS (
   SELECT year, county_fips, product_id, indication,
-         count(DISTINCT npi) FILTER (WHERE trx > 0) AS n_prescribers,
+         count(DISTINCT npi) FILTER (WHERE trx > 0 OR partb_units > 0) AS n_prescribers,
          sum(trx) AS trx, sum(partb_units) AS partb_units, sum(fills_30d) AS fills_30d,
          sum(patients) AS patients_min,
          sum(gross_cost) AS gross_cost, sum(pay_usd) AS pay_usd, sum(n_payments) AS n_payments
@@ -217,13 +217,22 @@ LEFT JOIN core.county c ON c.county_fips = a.county_fips;
 -- ---------------------------------------------------------------------
 DROP TABLE IF EXISTS mart.targeting_index CASCADE;
 CREATE TABLE mart.targeting_index AS
-WITH cp AS (
+WITH hcp AS (   -- distinct prescribers per county x product (an NPI split across
+                -- indications must count once, so don't sum the per-indication counts)
+  SELECT year, county_fips, product_id,
+         count(DISTINCT npi) FILTER (WHERE trx > 0 OR partb_units > 0) AS n_prescribers
+  FROM mart.npi_product_indication WHERE county_fips IS NOT NULL
+  GROUP BY 1, 2, 3
+),
+cp AS (
   SELECT year, county_fips, product_id, max(company) AS company, max(class_id) AS class_id,
          sum(fills_30d) AS fills_30d, sum(gross_cost) AS gross_cost, sum(pay_usd) AS pay_usd,
-         sum(n_prescribers) AS n_prescribers,
+         max(h.n_prescribers) AS n_prescribers,
          sum(n_payments) AS n_payments,
          max(burden_denominator) AS burden            -- primary indication's denominator
-  FROM mart.county_product_indication GROUP BY 1, 2, 3
+  FROM mart.county_product_indication
+  LEFT JOIN hcp h USING (year, county_fips, product_id)
+  GROUP BY 1, 2, 3
 ),
 tot AS (
   SELECT cp.*,

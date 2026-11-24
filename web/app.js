@@ -3,7 +3,8 @@
 "use strict";
 
 const D = "data/";
-const NON_CONUS_SKIP = new Set(["72", "78", "66", "60", "69"]);   // PR + territories: not drawn by AlbersUsa
+const NON_CONUS_SKIP = new Set(["78", "66", "60", "69"]);   // territories: not drawn (no ACS/PLACES coverage)
+const isPR = id => id.slice(0, 2) === "72";                    // Puerto Rico: drawn as an inset
 const PREV_BY_CLASS = {           // PLACES measure shown as "disease prevalence" for each class
   T2_BIOLOGIC: ["asthma", "Current asthma, adults %"],
   DOAC: ["chd", "Coronary heart disease, adults % (AF not in PLACES)"],
@@ -142,8 +143,11 @@ let path, mapG;
 function initMap() {
   const W = 975, H = 610;
   const svg = d3.select("#map").attr("viewBox", [0, 0, W, H]);
-  const proj = d3.geoAlbersUsa().fitSize([W, H], S.geo);
-  path = d3.geoPath(proj);
+  const fc = feats => ({ type: "FeatureCollection", features: feats });
+  const main = d3.geoPath(d3.geoAlbersUsa().fitSize([W, H], fc(S.geo.features.filter(f => !isPR(f.id)))));
+  const prBox = [[618, 548], [768, 592]];          // open water in the Gulf, below LA/MS
+  const pr = d3.geoPath(d3.geoMercator().fitExtent(prBox, fc(S.geo.features.filter(f => isPR(f.id)))));
+  path = f => (isPR(f.id) ? pr : main)(f);
   mapG = svg.append("g");
   mapG.selectAll("path.c").data(S.geo.features, d => d.id).join("path")
     .attr("class", "c").attr("d", path)
@@ -151,6 +155,10 @@ function initMap() {
     .on("mouseleave", hideTip)
     .on("click", (e, d) => select(d.id));
   svg.append("g").selectAll("path.st").data(S.states.features).join("path").attr("class", "st").attr("d", path);
+  const inset = svg.append("g");
+  inset.append("rect").attr("class", "inset").attr("x", prBox[0][0] - 8).attr("y", prBox[0][1] - 20)
+    .attr("width", prBox[1][0] - prBox[0][0] + 16).attr("height", prBox[1][1] - prBox[0][1] + 28).attr("rx", 4);
+  inset.append("text").attr("class", "inset-lbl").attr("x", prBox[0][0] - 2).attr("y", prBox[0][1] - 7).text("Puerto Rico");
   svg.call(d3.zoom().scaleExtent([1, 8]).translateExtent([[0, 0], [W, H]])
     .on("zoom", e => svg.selectAll("g").attr("transform", e.transform)));
 }

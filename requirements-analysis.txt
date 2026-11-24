@@ -1,0 +1,6 @@
+# Tests and statistical models (not needed to run the pipeline)
+pytest>=8.0
+statsmodels>=0.14
+libpysal>=4.10
+esda>=2.5
+spreg>=1.5
