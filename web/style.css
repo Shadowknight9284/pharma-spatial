@@ -148,3 +148,12 @@ button.more {
   .controls label { width: 100%; }
   .ind-row { grid-template-columns: 80px minmax(0, 1fr) 64px; }
 }
+
+/* GP section */
+.h3 { font-size: 14px; margin: 12px 0 4px; }
+.curves { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.curves svg { width: 100%; height: auto; }
+.curves .band { fill: var(--accent); fill-opacity: .18; }
+.curves .line { fill: none; stroke: var(--accent); stroke-width: 2; }
+#gp-map path { stroke: var(--stroke); stroke-width: .15; }
+#gp-map path.st { fill: none; stroke: var(--stroke); stroke-width: .7; }

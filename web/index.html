@@ -126,6 +126,43 @@
           <p class="help" id="m3-note"></p>
         </div>
       </div>
+      <div class="card" id="m5-card">
+        <h2>5 · Two years: what happens when a prescriber starts being paid?</h2>
+        <p class="help">Change in the product's share of the <b>same prescriber's</b> class fills from last year to
+          this year, for prescribers who <b>started</b> receiving payments naming it, vs never-paid peers of the same
+          specialty in the same county. Anything fixed about the prescriber cancels out. Bars: 95% CI.</p>
+        <svg id="m5" role="img" aria-label="Within-prescriber change coefficients"></svg>
+        <p class="help" id="m5-note"></p>
+      </div>
+      <div class="card" id="gp-card">
+        <h2>4 · Gaussian process: how much of promotion is location?</h2>
+        <p class="help">County promotion per 1,000 aged 65+ = location effect + covariate effect + noise. Location
+          is two Matérn kernels on distance (a local and a regional scale); the covariates (sales, disease
+          prevalence, SVI, income, population) get one flexible kernel with a separate lengthscale each. All learned
+          from the data. Full tables: <code>analysis/results/gp.md</code>.</p>
+        <div class="controls">
+          <label>Class <select id="gp-class"></select></label>
+          <label>Map <select id="gp-layer">
+            <option value="space_effect">Location effect (local + regional)</option>
+            <option value="local_effect">Local effect only</option>
+            <option value="cov_effect">Covariate effect</option>
+          </select></label>
+        </div>
+        <div class="kpis" id="gp-kpis"></div>
+        <div class="grid2">
+          <div>
+            <svg id="gp-map" role="img" aria-label="Map of the GP location effect"></svg>
+            <div id="gp-legend" class="legend"></div>
+          </div>
+          <div>
+            <h3 class="h3">Out-of-sample R² (5-fold)</h3>
+            <svg id="gp-cv" role="img" aria-label="Cross-validated R squared by model"></svg>
+            <p class="help" id="gp-cv-note"></p>
+          </div>
+        </div>
+        <h3 class="h3">Effect of each covariate (others held at their average; band = 90%)</h3>
+        <div id="gp-curves" class="curves"></div>
+      </div>
     </section>
 
     <!-- ABOUT -------------------------------------------------------- -->

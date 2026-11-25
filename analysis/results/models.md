@@ -1,6 +1,6 @@
 # Models — 2024
 
-_Generated 2026-11-24 21:12 UTC by `python -m analysis.models`._
+_Generated 2026-11-25 02:04 UTC by `python -m analysis.models`._
 
 All results are **cross-sectional associations**. Companies pay the prescribers and places that already prescribe the most, so none of these coefficients is a causal effect of promotion.
 
@@ -73,9 +73,23 @@ n = 1,207 counties · OLS R² = 0.55 · Moran's I of OLS residuals = 0.11 (p = 0
 | log_income | +0.184 (0.287) | +0.095 (0.299) |
 | log_pop | +0.802 (0.045) | +0.795 (0.045) |
 
+## M5. Two years: change in share when a prescriber starts or stops being paid (2023 → 2024)
+
+Outcome: change in the product's share of the prescriber's class fills (pp) between the two years. Groups: started being paid for the product, stopped, paid both years; reference = paid neither year. Controls: change in log rival payments and log class volume; specialty and county fixed effects (i.e. specialty- and county-specific trends). Same prescriber in both years, >= 12 class fills each year. Anything fixed about the prescriber (habits, patient mix, existing loyalty) cancels out.
+
+| Product | Prescribers | Started / stopped / both | Started paid (pp) | Stopped (pp) | Paid both years (pp) |
+|---|---:|---:|---:|---:|---:|
+| ELIQUIS | 213,682 | 9,956 / 12,954 / 22,563 | +0.11 [-0.23, +0.45] | -0.04 [-0.32, +0.23] | +0.40 [+0.20, +0.60] |
+| XARELTO | 213,682 | 5,452 / 11,975 / 12,340 | +0.07 [-0.37, +0.50] | -0.08 [-0.37, +0.22] | -0.10 [-0.38, +0.18] |
+| JARDIANCE | 156,078 | 11,461 / 10,806 / 30,840 | +0.62 [+0.15, +1.09] | +0.48 [-0.00, +0.96] | +1.10 [+0.80, +1.39] |
+| FARXIGA | 156,078 | 10,267 / 12,925 / 25,539 | +0.64 [+0.14, +1.13] | -0.88 [-1.36, -0.41] | -1.12 [-1.48, -0.76] |
+| DUPIXENT | 10,533 | 769 / 545 / 6,136 | -1.19 [-2.88, +0.50] | -0.37 [-2.37, +1.62] | -0.70 [-1.87, +0.47] |
+
+**Reading:** _Started paid_ is how much more the product's share rose for prescribers who began receiving payments naming it than for never-paid peers of the same specialty in the same county. Still not proof of causation: companies may start paying prescribers whose use is already rising.
+
 ## Limits
 
-* One year, cross-section: payments and prescribing are measured in the same year, and promotion is targeted at existing high prescribers (reverse causality). Adding 2023 would allow lagged payments and within-prescriber changes (a much stronger design).
+* M1-M3 are one-year cross-sections: promotion is targeted at existing high prescribers (reverse causality). M5 compares the same prescriber across two years, which removes fixed differences between prescribers but not companies targeting prescribers whose use is already rising.
 * Medicare Part D only; CMS suppresses cells under 11 claims; indication is inferred.
 * Open Payments excludes rep detailing without a transfer of value, samples and DTC ads.
 * M3's burden proxies are imperfect (no AF in PLACES; DOAC uses coronary heart disease).

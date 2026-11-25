@@ -5,3 +5,7 @@ libpysal>=4.10
 esda>=2.5
 spreg>=1.5
 pyfixest>=0.25
+# M4 Gaussian process (analysis/gp.py). CPU build is enough:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.2
+gpytorch>=1.11

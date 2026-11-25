@@ -15,7 +15,7 @@ CREATE TABLE mart.npi_class_product AS
 WITH rx AS (
   SELECT r.year, r.npi, d.product_id, sum(r.fills_30d) AS fills
   FROM core.rx_fact r JOIN core.drug d USING (brand_key)
-  WHERE d.product_id IS NOT NULL AND r.benefit = 'D' AND r.year = core.cur_year()
+  WHERE d.product_id IS NOT NULL AND r.benefit = 'D'
   GROUP BY 1, 2, 3
 ),
 pay AS (
@@ -26,7 +26,7 @@ pay AS (
          coalesce(sum(amount_alloc) FILTER (WHERE nature ILIKE '%speaker%'
                                                OR nature ILIKE '%faculty%'), 0) AS speaker_usd
   FROM core.payment_fact
-  WHERE npi IS NOT NULL AND product_id IS NOT NULL AND year = core.cur_year()
+  WHERE npi IS NOT NULL AND product_id IS NOT NULL
   GROUP BY 1, 2, 3
 ),
 cls AS (

@@ -96,6 +96,7 @@ Preview locally with `python -m http.server -d web 8000`. To publish, enable Git
 ```bash
 pip install -r requirements-analysis.txt
 python -m analysis.models --year 2024   # ~10 s; needs `sql` (builds mart.npi_class_product)
+python -m analysis.gp --year 2024       # ~25 min on 16 CPU cores (exact GPs + 5-fold CV)
 pytest tests/                           # offline source-discovery tests
 ```
 
@@ -106,12 +107,27 @@ pytest tests/                           # offline source-discovery tests
 | M1 | Do prescribers paid for a product write more of it? | Prescriber x product within class; share of class fills ~ paid, with specialty + county fixed effects, class volume, rival payments; SEs clustered by county (pyfixest) |
 | M2 | Does share of voice track share of market? | County x product; fill share ~ promotion share, product + county fixed effects |
 | M3 | What does promotion track beyond sales? | County x class; promotion per 65+ ~ sales, disease burden, SVI, income, population; OLS + spatial lag (PySAL spreg, 6-NN weights), Moran's I |
+| M4 | How much of promotion is location, and which covariates matter? | Same county outcome; additive Gaussian process (GPyTorch): local + regional Matérn kernels on projected km + ARD RBF kernel on the covariates; learned spatial ranges, variance shares, covariate effect curves, 5-fold CV vs linear (`analysis/gp.py` → `analysis/results/gp.md`, `web/data/gp.json`) |
+| M5 | Does share change when a prescriber starts or stops being paid? | Same prescriber, two years; change in share ~ started / stopped / paid-both vs never paid, change in rival payments and class volume, specialty + county fixed effects (needs year-1 loaded) |
 
 2024 headline: paid prescribers have a higher share of the promoted product than same-specialty,
 same-county peers (Farxiga +15 pp, Dupixent +8, Xarelto +3, Eliquis +2, Jardiance ~0); rival
 promotion goes with lower share; county promotion follows sales and population, with disease burden
-adding a little only for SGLT2s and SVI adding nothing. All cross-sectional associations, not causal
-effects: a second year (lagged payments, within-prescriber change) is the next step.
+adding a little only for SGLT2s and SVI adding nothing.
+
+Two years (M5, 2023 → 2024) shrink that a lot: within the same prescriber, starting to be paid goes
+with +0.6 pp for Farxiga (and stopping with -0.9 pp), and nothing detectable for Eliquis, Xarelto or
+Dupixent. Most of the cross-sectional gap is who gets paid (targeting), not a change after payment.
+
+The GP (M4) finds two spatial scales in county promotion for SGLT2s and DOACs, a local one
+(~100-130 km: metro areas / territories) and a regional one (~1,800-2,300 km); T2 biologics show only
+broad structure (both scales 600+ km, together ~4% of variance). Location adds real out-of-sample fit over the
+covariates alone (CV R² 0.54 → 0.62 for SGLT2, 0.51 → 0.58 for DOACs, 0.57 → 0.61 for T2 biologics),
+removing the leftover spatial clustering in the errors (Moran's I 0.22 → -0.05 for SGLT2). Sales and
+population carry most of the covariate signal; prevalence, SVI and income curves are nearly flat.
+
+To load a second year: `python -m pipeline.run all --year 2023`, then rerun `all --year 2024` so the
+dimension tables and the website describe 2024 (fact tables keep both years).
 
 ## Two tiers
 
@@ -171,3 +187,5 @@ effects: a second year (lagged payments, within-prescriber change) is the next s
 * Connecticut replaced its 8 counties with 9 planning regions in 2022. ZIPs are mapped to the new
   regions through 2020 towns (`zcta_cousub` + Census `ct_cousub_xwalk`) so CT joins ACS, SVI and TIGER.
 * The website draws Puerto Rico as an inset; other territories have no ACS/PLACES coverage and are not drawn.
+* The current CDC PLACES release has no diabetes, coronary heart disease or asthma estimates for
+  Kentucky (only 5 of 40 measures), so Kentucky drops out of M3, M4 and the burden metrics.

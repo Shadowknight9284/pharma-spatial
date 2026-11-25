@@ -58,7 +58,8 @@ Promise.all([
   d3.json(D + "counties.geojson"), d3.json(D + "states.geojson"),
   d3.json(D + "indications.json"), d3.json(D + "companies.json"),
   d3.json(D + "models.json").catch(() => null),
-]).then(([meta, base, geo, states, ind, cos, models]) => {
+  d3.json(D + "gp.json").catch(() => null),
+]).then(([meta, base, geo, states, ind, cos, models, gp]) => {
   S.meta = meta; S.base = base;
   base.fips.forEach((f, i) => S.baseIdx.set(f, i));
   geo.features = geo.features.filter(f => !NON_CONUS_SKIP.has(f.id.slice(0, 2)));
@@ -66,7 +67,8 @@ Promise.all([
   S.geo = geo; S.states = states;
   d3.select("#year").text(meta.year);
   initTabs(); initControls(); initMap(); renderAbout(); renderCompanies(cos); renderIndications(ind);
-  if (models) S.models = models; else d3.select('[data-tab="models"]').remove();
+  if (models) S.models = { ...models, gp }; else d3.select('[data-tab="models"]').remove();
+  if (!gp) d3.select("#gp-card").remove();
   selectProduct(meta.products.find(p => p.id === "DUPIXENT") ? "DUPIXENT" : meta.products[0].id);
 }).catch(err => {
   d3.select("main").insert("p", ":first-child").attr("class", "card")
@@ -429,6 +431,112 @@ function renderModels(M) {
     `${cell(r.coef.log_fills_pc.lag, r.coef.log_fills_pc.lag_se)}${cell(r.rho, r.rho_se)}`);
   d3.select("#m3-note").text("Coefficients on log promotion per 1,000 aged 65+. ns = not significant at 5%. " +
     "Burden: diabetes (SGLT2), coronary heart disease (DOAC, AF is not in PLACES), asthma (T2 biologics).");
+  if (M.m5 && M.m5.length) {
+    coefPlot("#m5", M.m5.map(r => ({ name: brand(r.product), est: r.started.est, lo: r.started.lo, hi: r.started.hi })),
+      { label: "name", est: "est", lo: "lo", hi: "hi", unit: " pp" });
+    d3.select("#m5-note").text("Prescribers who stopped being paid: " +
+      M.m5.map(r => `${brand(r.product)} ${(r.stopped.est > 0 ? "+" : "") + r.stopped.est.toFixed(1)}`).join(", ") +
+      " pp. Not proof of causation: companies may start paying prescribers whose use is already rising.");
+  } else d3.select("#m5-card").remove();
+  if (M.gp) renderGP(M.gp);
+}
+
+// ---------------------------------------------------------------- M4: Gaussian process
+const GP_SHORT = { DOAC: "DOACs (blood thinners)", SGLT2: "SGLT2 (diabetes/heart)", T2_BIOLOGIC: "T2 biologics (asthma/eczema)" };
+const GP_COV = { log_fills_pc: "Sales (fills per 1k 65+)", prev: "Disease prevalence (%)", svi: "SVI",
+                 log_income: "Median income", log_pop: "Population" };
+const GP_CV = [["linear", "Linear (covariates)"], ["gp_cov", "GP covariates"], ["gp_space", "GP location"],
+               ["gp_both", "GP location + covariates"]];
+const pctEff = v => { const p = (Math.exp(v) - 1) * 100; return (p > 0 ? "+" : "") + d3.format(".0f")(p) + "%"; };
+
+function renderGP(G) {
+  const sel = d3.select("#gp-class");
+  if (!sel.selectAll("option").size()) {
+    sel.selectAll("option").data(G.classes).join("option").attr("value", d => d.class).text(d => GP_SHORT[d.class] || d.class);
+    sel.on("change", () => renderGP(G));
+    d3.select("#gp-layer").on("change", () => renderGP(G));
+  }
+  const r = G.classes.find(d => d.class === sel.property("value")) || G.classes[0];
+  const sh = r.shares, rg = r.range_km;
+  d3.select("#gp-kpis").html("").selectAll("div").data([
+    ["Counties", fmt.int(r.n)],
+    ["Local range", d3.format(",.0f")(rg.local) + " km"],
+    ["Regional range", d3.format(",.0f")(rg.regional) + " km"],
+    ["Variance: location", d3.format(".0%")(sh.space)],
+    ["Variance: covariates", d3.format(".0%")(sh.covariates)],
+    ["Unexplained", d3.format(".0%")(sh.residual)],
+  ]).join("div").attr("class", "kpi").html(d => `<div class="k">${d[0]}</div><div class="v">${d[1]}</div>`);
+  gpMap(r);
+  gpCV(r);
+  gpCurves(r);
+}
+
+function gpMap(r) {
+  const layer = d3.select("#gp-layer").property("value");
+  const vals = r[layer];
+  const W = Math.max(300, d3.select("#gp-map").node().parentNode.getBoundingClientRect().width), H = W * 0.62;
+  const feats = S.geo.features.filter(f => !["02", "15", "72"].includes(f.id.slice(0, 2)));
+  const path = d3.geoPath(d3.geoAlbersUsa().fitSize([W, H], { type: "FeatureCollection", features: feats }));
+  const v = Object.values(vals).map(Math.abs).sort(d3.ascending);
+  const lim = d3.quantile(v, 0.98) || 1;
+  const col = d3.scaleDiverging(t => d3.interpolateRdBu(1 - t)).domain([-lim, 0, lim]).clamp(true);
+  const svg = d3.select("#gp-map").attr("viewBox", [0, 0, W, H]).attr("width", W).attr("height", H).html("");
+  svg.append("g").selectAll("path").data(feats).join("path").attr("d", path)
+    .attr("fill", f => vals[f.id] == null ? "var(--nodata)" : col(vals[f.id]))
+    .append("title").text(f => `${countyName(f.id)}\n` + (vals[f.id] == null ? "no data" : pctEff(vals[f.id]) + " promotion vs. average"));
+  svg.append("g").selectAll("path").data(S.states.features.filter(f => !["02", "15", "72"].includes(f.id)))
+    .join("path").attr("class", "st").attr("d", path);
+  const lg = d3.select("#gp-legend").html("");
+  const LW = Math.min(W, 360), ls = lg.append("svg").attr("viewBox", [0, 0, LW, 34]).attr("width", LW);
+  const id = "gpl" + Math.random().toString(36).slice(2);
+  ls.append("defs").append("linearGradient").attr("id", id).selectAll("stop").data(d3.range(11))
+    .join("stop").attr("offset", i => i * 10 + "%").attr("stop-color", i => col(-lim + (2 * lim * i) / 10));
+  ls.append("rect").attr("x", 20).attr("y", 4).attr("width", LW - 40).attr("height", 12).attr("rx", 2).attr("fill", `url(#${id})`);
+  [[-lim, 20, "start"], [0, LW / 2, "middle"], [lim, LW - 20, "end"]].forEach(([t, x, a]) =>
+    ls.append("text").attr("x", x).attr("y", 30).attr("text-anchor", a).attr("fill", "currentColor").attr("font-size", 11).text(pctEff(t)));
+  lg.append("div").text({ space_effect: "Promotion explained by location alone, vs. a county with the same covariates elsewhere.",
+                          local_effect: "Short-range part only: metro-area / sales-territory pockets.",
+                          cov_effect: "Promotion explained by the county's covariates alone." }[layer]);
+}
+
+function gpCV(r) {
+  const rows = GP_CV.map(([k, l]) => ({ k, l, r2: r.cv[k].r2, I: r.cv[k].moran_I }));
+  const W = Math.max(280, d3.select("#gp-cv").node().parentNode.getBoundingClientRect().width), rowH = 30;
+  const m = { t: 6, r: 48, b: 24, l: 160 }, H = m.t + m.b + rowH * rows.length;
+  const svg = d3.select("#gp-cv").attr("viewBox", [0, 0, W, H]).attr("width", W).attr("height", H).html("");
+  const x = d3.scaleLinear().domain([0, Math.max(0.7, d3.max(rows, d => d.r2))]).nice().range([m.l, W - m.r]);
+  const y = d3.scaleBand().domain(rows.map(d => d.l)).range([m.t, H - m.b]).padding(0.3);
+  svg.append("g").attr("class", "axis grid").attr("transform", `translate(0,${H - m.b})`)
+    .call(d3.axisBottom(x).ticks(4).tickSize(-(H - m.t - m.b)));
+  const g = svg.append("g").selectAll("g").data(rows).join("g");
+  g.append("rect").attr("x", m.l).attr("y", d => y(d.l)).attr("height", y.bandwidth())
+    .attr("width", d => Math.max(0, x(d.r2) - m.l)).attr("fill", d => d.k === "gp_both" ? "var(--accent)" : "var(--muted)").attr("rx", 2);
+  g.append("text").attr("class", "lbl").attr("x", m.l - 8).attr("y", d => y(d.l) + y.bandwidth() / 2 + 4).attr("text-anchor", "end").text(d => d.l);
+  g.append("text").attr("class", "lbl").attr("x", d => x(d.r2) + 6).attr("y", d => y(d.l) + y.bandwidth() / 2 + 4).text(d => d.r2.toFixed(2));
+  const a = r.cv.linear, b = r.cv.gp_both;
+  d3.select("#gp-cv-note").text(`Leftover spatial clustering in the errors (Moran's I): ${a.moran_I.toFixed(2)} for the linear model, ` +
+    `${b.moran_I.toFixed(2)} for GP location + covariates. Closer to 0 = the location terms soaked up the geographic pattern.`);
+}
+
+function gpCurves(r) {
+  const box = d3.select("#gp-curves").html("");
+  const all = Object.values(r.curves).flatMap(c => c.mean.map((m, i) => [m - 1.645 * c.sd[i], m + 1.645 * c.sd[i]]).flat());
+  const yd = d3.extent(all);
+  Object.entries(r.curves).forEach(([k, c]) => {
+    const W = 260, H = 170, m = { t: 22, r: 10, b: 30, l: 44 };
+    const svg = box.append("svg").attr("viewBox", [0, 0, W, H]);
+    const logx = ["log_income", "log_pop", "log_fills_pc"].includes(k);
+    const x = (logx ? d3.scaleLog() : d3.scaleLinear()).domain(d3.extent(c.x)).range([m.l, W - m.r]);
+    const y = d3.scaleLinear().domain(yd).nice().range([H - m.b, m.t]);
+    const pts = c.x.map((v, i) => ({ x: v, m: c.mean[i], lo: c.mean[i] - 1.645 * c.sd[i], hi: c.mean[i] + 1.645 * c.sd[i] }));
+    svg.append("text").attr("x", m.l).attr("y", 14).attr("font-size", 12).attr("font-weight", 600).attr("fill", "currentColor").text(GP_COV[k] || k);
+    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`)
+      .call(d3.axisBottom(x).ticks(3, logx ? "~s" : "~r"));
+    svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(pctEff));
+    svg.append("line").attr("class", "diag").attr("x1", m.l).attr("x2", W - m.r).attr("y1", y(0)).attr("y2", y(0));
+    svg.append("path").attr("class", "band").attr("d", d3.area().x(d => x(d.x)).y0(d => y(d.lo)).y1(d => y(d.hi))(pts));
+    svg.append("path").attr("class", "line").attr("d", d3.line().x(d => x(d.x)).y(d => y(d.m))(pts));
+  });
 }
 
 // ---------------------------------------------------------------- about

@@ -186,12 +186,56 @@ def m3(conn, year):
     return out
 
 
+# ---------------------------------------------------------------- M5
+def m5(conn, year):
+    """Two-year, within-prescriber change (year-1 -> year). Empty list if year-1 isn't loaded."""
+    import pyfixest as pf
+
+    has = sql_df(conn, "SELECT count(*) AS n FROM mart.npi_class_product WHERE year = %(y)s", y=year - 1)
+    if int(has.n[0]) == 0:
+        return []
+    rows = []
+    for pid in M1_PRODUCTS:
+        df = sql_df(conn, """
+            SELECT a.npi, a.specialty, a.county_fips,
+                   a.class_fills AS cf1, b.class_fills AS cf0, a.share AS s1, b.share AS s0,
+                   a.pay_usd AS p1, b.pay_usd AS p0, a.rival_pay_usd AS r1, b.rival_pay_usd AS r0
+            FROM mart.npi_class_product a
+            JOIN mart.npi_class_product b ON b.npi = a.npi AND b.product_id = a.product_id AND b.year = %(y0)s
+            WHERE a.year = %(y)s AND a.product_id = %(p)s AND a.entity_type = '1'
+              AND a.class_fills >= 12 AND b.class_fills >= 12
+              AND a.specialty IS NOT NULL AND a.county_fips IS NOT NULL
+        """, y=year, y0=year - 1, p=pid)
+        num(df, ["cf1", "cf0", "s1", "s0", "p1", "p0", "r1", "r0"])
+        df = df[df.groupby("specialty")["npi"].transform("size") >= 50]
+        paid0, paid1 = df.p0 > 0, df.p1 > 0
+        df["started"] = (~paid0 & paid1).astype(float)
+        df["stopped"] = (paid0 & ~paid1).astype(float)
+        df["always"] = (paid0 & paid1).astype(float)
+        df["d_share_pp"] = 100 * (df.s1 - df.s0)
+        df["d_log_rival"] = np.log1p(df.r1) - np.log1p(df.r0)
+        df["d_log_class"] = np.log(df.cf1) - np.log(df.cf0)
+        fit = pf.feols("d_share_pp ~ started + stopped + always + d_log_rival + d_log_class | specialty + county_fips",
+                       data=df, vcov={"CRV1": "county_fips"})
+        t = fit.tidy()
+        g = lambda k: {"est": float(t.loc[k, "Estimate"]), "lo": float(t.loc[k, "2.5%"]), "hi": float(t.loc[k, "97.5%"])}
+        rows.append({"product": pid, "n_npi": int(len(df)),
+                     "n_started": int(df.started.sum()), "n_stopped": int(df.stopped.sum()),
+                     "n_always": int(df.always.sum()),
+                     "mean_d_share": float(df.d_share_pp.mean()),
+                     "started": g("started"), "stopped": g("stopped"), "always": g("always"),
+                     "rival": g("d_log_rival")})
+        print(f"  M5 {pid}: n={len(df):,} started={rows[-1]['started']['est']:+.2f}pp "
+              f"stopped={rows[-1]['stopped']['est']:+.2f}pp")
+    return rows
+
+
 # ---------------------------------------------------------------- report
 def ci(b, lo, hi, d=2):
     return f"{b:+.{d}f} [{lo:+.{d}f}, {hi:+.{d}f}]"
 
 
-def report(year, r1, r2, r3) -> str:
+def report(year, r1, r2, r3, r5=()) -> str:
     L = [f"# Models — {year}", "",
          f"_Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC by `python -m analysis.models`._", "",
          "All results are **cross-sectional associations**. Companies pay the prescribers and "
@@ -238,10 +282,27 @@ def report(year, r1, r2, r3) -> str:
         for n, c in r["coef"].items():
             L.append(f"| {n} | {c['ols']:+.3f} ({c['ols_se']:.3f}) | {c['lag']:+.3f} ({c['lag_se']:.3f}) |")
         L.append("")
+    if r5:
+        L += [f"## M5. Two years: change in share when a prescriber starts or stops being paid ({year - 1} → {year})", "",
+              "Outcome: change in the product's share of the prescriber's class fills (pp) between the two years. "
+              "Groups: started being paid for the product, stopped, paid both years; reference = paid neither year. "
+              "Controls: change in log rival payments and log class volume; specialty and county fixed effects "
+              "(i.e. specialty- and county-specific trends). Same prescriber in both years, >= 12 class fills each "
+              "year. Anything fixed about the prescriber (habits, patient mix, existing loyalty) cancels out.", "",
+              "| Product | Prescribers | Started / stopped / both | Started paid (pp) | Stopped (pp) | Paid both years (pp) |",
+              "|---|---:|---:|---:|---:|---:|"]
+        for r in r5:
+            L.append(f"| {r['product']} | {r['n_npi']:,} | {r['n_started']:,} / {r['n_stopped']:,} / {r['n_always']:,} | "
+                     f"{ci(r['started']['est'], r['started']['lo'], r['started']['hi'])} | "
+                     f"{ci(r['stopped']['est'], r['stopped']['lo'], r['stopped']['hi'])} | "
+                     f"{ci(r['always']['est'], r['always']['lo'], r['always']['hi'])} |")
+        L += ["", "**Reading:** _Started paid_ is how much more the product's share rose for prescribers who began "
+              "receiving payments naming it than for never-paid peers of the same specialty in the same county. "
+              "Still not proof of causation: companies may start paying prescribers whose use is already rising.", ""]
     L += ["## Limits", "",
-          "* One year, cross-section: payments and prescribing are measured in the same year, and "
-          "promotion is targeted at existing high prescribers (reverse causality). Adding 2023 would "
-          "allow lagged payments and within-prescriber changes (a much stronger design).",
+          "* M1-M3 are one-year cross-sections: promotion is targeted at existing high prescribers "
+          "(reverse causality). M5 compares the same prescriber across two years, which removes fixed "
+          "differences between prescribers but not companies targeting prescribers whose use is already rising.",
           "* Medicare Part D only; CMS suppresses cells under 11 claims; indication is inferred.",
           "* Open Payments excludes rep detailing without a transfer of value, samples and DTC ads.",
           "* M3's burden proxies are imperfect (no AF in PLACES; DOAC uses coronary heart disease).", ""]
@@ -256,9 +317,10 @@ def main(argv=None):
         print("M1 prescriber-level ..."); r1 = m1(conn, a.year)
         print("M2 share of voice ...");   r2 = m2(conn, a.year)
         print("M3 spatial ...");          r3 = m3(conn, a.year)
+        print("M5 two-year change ...");  r5 = m5(conn, a.year)
     OUT_MD.parent.mkdir(parents=True, exist_ok=True)
-    OUT_MD.write_text(report(a.year, r1, r2, r3))
-    OUT_JSON.write_text(json.dumps({"year": a.year, "m1": r1, "m2": r2, "m3": r3}, separators=(",", ":")))
+    OUT_MD.write_text(report(a.year, r1, r2, r3, r5))
+    OUT_JSON.write_text(json.dumps({"year": a.year, "m1": r1, "m2": r2, "m3": r3, "m5": r5}, separators=(",", ":")))
     print(f"wrote {OUT_MD.relative_to(ROOT)} and {OUT_JSON.relative_to(ROOT)}")
 
 
