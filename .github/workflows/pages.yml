@@ -23,5 +23,8 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
+      # deploy-pages sometimes can't see an artifact uploaded a second earlier ("No artifacts named
+      # github-pages were found"); give the artifact API a moment to catch up.
+      - run: sleep 20
       - id: deployment
         uses: actions/deploy-pages@v4
